@@ -1,0 +1,59 @@
+name: Test github-action
+
+on:
+  push:
+    branches:
+      - main
+
+
+jobs:
+  test-action:
+    runs-on: windows-latest
+    steps:
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: 3.12 # 你可以指定 Python 版本
+          auto-update-conda: true # 自动更新 conda
+      
+      - name: verify anaconda install
+        run: |
+          conda --version
+          python --version
+          where python
+
+      - name: install postgresql
+        run: |
+          conda install anaconda::postgresql
+          conda install -c conda-forge pgvector
+
+      # - name: download postgresql
+      #   run: |
+      #     curl.exe -O https://get.enterprisedb.com/postgresql/postgresql-18.1-1-windows-x64-binaries.zip
+      #     tar xvf postgresql-18.1-1-windows-x64-binaries.zip
+      #     ls
+      #     ls pgsql
+      #     # Set PATH to include PostgreSQL bin directory
+      #     $pwd=Get-Location
+      #     "$pwd\pgsql\bin" | Add-Content -Path $env:GITHUB_PATH
+      #     Write-Host "PostgreSQL binaries path added to PATH:"
+      #     Write-Host $env:GITHUB_PATH
+
+      - name: test postgresql install
+        run: |
+          pg_ctl --version
+          # 1. 初始化数据库，超级用户将是 'runneradmin'
+          initdb -D test-data
+
+          # 2. 启动服务器
+          pg_ctl -D test-data -o "-F" -l logfile start
+
+          # 3. 执行所有数据库命令
+          #    - 使用 -U runneradmin 来指定正确的用户
+          #    - 使用 -d postgres 来指定要连接的默认数据库
+          psql -U runneradmin -d postgres -c "SELECT version();"
+          psql -U runneradmin -d postgres -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          psql -U runneradmin -d postgres -c "SELECT * FROM pg_extension;"
+
+          # 4. 所有操作完成后，停止服务器
+          pg_ctl -D test-data stop
